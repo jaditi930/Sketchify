@@ -69,9 +69,10 @@ export const setupWhiteboardSocket = (io: Server): void => {
           });
         } else {
           // Whiteboard doesn't exist - create it for anyone (guests or authenticated users)
+          // Default name is the roomId
           const newWhiteboard = new Whiteboard({
             roomId,
-            name: `Room ${roomId}`,
+            name: roomId,
             owner: socket.userId || 'guest', // Use 'guest' for non-authenticated users
             isProtected: false, // All auto-created rooms are public by default
             collaborators: [],

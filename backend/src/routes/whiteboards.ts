@@ -5,6 +5,29 @@ import User from '../models/User';
 
 const router = express.Router();
 
+// Generate a unique 8-character room ID
+const generateRoomId = async (): Promise<string> => {
+  const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
+  let roomId: string;
+  let isUnique = false;
+  
+  while (!isUnique) {
+    // Generate random 8-character string
+    roomId = '';
+    for (let i = 0; i < 8; i++) {
+      roomId += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    
+    // Check if it's unique
+    const existing = await Whiteboard.findOne({ roomId });
+    if (!existing) {
+      isUnique = true;
+    }
+  }
+  
+  return roomId!;
+};
+
 // Get all whiteboards for the authenticated user (owned or collaborated)
 router.get('/', authenticate, async (req: AuthRequest, res: Response) => {
   try {
@@ -145,15 +168,15 @@ router.post('/', authenticate, async (req: AuthRequest, res: Response) => {
     const { name, isProtected } = req.body;
     const userId = req.user!.id;
 
-    // Generate unique roomId
-    const roomId = `room-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    // Generate unique 8-character roomId
+    const roomId = await generateRoomId();
 
-    // Auto-generate name if not provided
-    const generatedName = name || `Whiteboard ${new Date().toLocaleDateString()} ${new Date().toLocaleTimeString()}`;
+    // Default name is the roomId, unless explicitly provided
+    const whiteboardName = name || roomId;
 
     const whiteboard = new Whiteboard({
       roomId,
-      name: generatedName,
+      name: whiteboardName,
       owner: userId,
       isProtected: isProtected !== undefined ? isProtected : true, // Default to protected (private)
       collaborators: [],

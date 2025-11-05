@@ -3,9 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useAppDispatch, useAppSelector } from '../store/hooks';
 import { setColor, setLineWidth, clearStrokes, setTool, setShape, ToolType, ShapeType } from '../store/slices/whiteboardSlice';
-import { logout } from '../store/slices/authSlice';
-import { getSocket, disconnectSocket } from '../lib/socket';
-import { toggleTheme } from '../store/slices/themeSlice';
+import { getSocket } from '../lib/socket';
 import WhiteboardSettings from './WhiteboardSettings';
 
 interface ToolbarProps {
@@ -15,25 +13,33 @@ interface ToolbarProps {
 
 export default function Toolbar({ onBackToList, onUpdate }: ToolbarProps) {
   const dispatch = useAppDispatch();
-  const { color, lineWidth, roomId, whiteboardName, isConnected, tool, shape } = useAppSelector((state) => state.whiteboard);
-  const { theme } = useAppSelector((state) => state.theme);
-  const { isAuthenticated } = useAppSelector((state) => state.auth);
+  const { color, lineWidth, roomId, whiteboardName, whiteboardOwner, isConnected, tool, shape } = useAppSelector((state) => state.whiteboard);
+  const { isAuthenticated, user } = useAppSelector((state) => state.auth);
   const [showSettings, setShowSettings] = useState(false);
-  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
-  const tools: { type: ToolType; icon: string; label: string }[] = [
-    { type: 'pen', icon: '✏️', label: 'Pen' },
-    { type: 'eraser', icon: '🧹', label: 'Eraser' },
-    { type: 'highlighter', icon: '🖍️', label: 'Highlighter' },
+  // Combined tools and shapes - only one can be selected at a time
+  const allTools = [
+    // Drawing tools
+    { tool: 'pen' as ToolType, shape: 'freehand' as ShapeType, icon: '✏️', label: 'Pen' },
+    { tool: 'eraser' as ToolType, shape: 'freehand' as ShapeType, icon: '🧹', label: 'Eraser' },
+    { tool: 'highlighter' as ToolType, shape: 'freehand' as ShapeType, icon: '🖍️', label: 'Highlighter' },
+    // Shapes
+    { tool: 'pen' as ToolType, shape: 'line' as ShapeType, icon: '📏', label: 'Line' },
+    { tool: 'pen' as ToolType, shape: 'rectangle' as ShapeType, icon: '▭', label: 'Rectangle' },
+    { tool: 'pen' as ToolType, shape: 'square' as ShapeType, icon: '▢', label: 'Square' },
+    { tool: 'pen' as ToolType, shape: 'circle' as ShapeType, icon: '⭕', label: 'Circle' },
   ];
 
-  const shapes: { type: ShapeType; icon: string; label: string }[] = [
-    { type: 'freehand', icon: '✍️', label: 'Freehand' },
-    { type: 'line', icon: '📏', label: 'Line' },
-    { type: 'rectangle', icon: '▭', label: 'Rectangle' },
-    { type: 'square', icon: '▢', label: 'Square' },
-    { type: 'circle', icon: '⭕', label: 'Circle' },
-  ];
+  // Check if a tool/shape combination is currently selected
+  const isToolSelected = (toolType: ToolType, shapeType: ShapeType) => {
+    return tool === toolType && shape === shapeType;
+  };
+
+  // Handle tool selection
+  const handleToolSelect = (toolType: ToolType, shapeType: ShapeType) => {
+    dispatch(setTool(toolType));
+    dispatch(setShape(shapeType));
+  };
 
   const colors = [
     { name: 'Black', value: '#000000' },
@@ -61,11 +67,6 @@ export default function Toolbar({ onBackToList, onUpdate }: ToolbarProps) {
     }
   };
 
-  const handleLogout = () => {
-    disconnectSocket();
-    dispatch(logout());
-  };
-
   // Auto-adjust line width when switching tools
   useEffect(() => {
     if (tool === 'eraser' && lineWidth < 10) {
@@ -83,15 +84,17 @@ export default function Toolbar({ onBackToList, onUpdate }: ToolbarProps) {
       {/* Top Header */}
       <div className="fixed top-0 left-0 right-0 z-50 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 shadow-sm h-16">
         <div className="flex items-center justify-between h-full px-6">
-          {/* Left side - Menu Button, Whiteboard Name & Status */}
+          {/* Left side - Back Button, Whiteboard Name & Status */}
           <div className="flex items-center gap-4">
-            <button
-              onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-              className="lg:hidden p-2 text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
-              title="Toggle Sidebar"
-            >
-              {isSidebarOpen ? '✕' : '☰'}
-            </button>
+            {onBackToList && (
+              <button
+                onClick={onBackToList}
+                className="px-3 py-1.5 text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
+                title="Back to Whiteboard List"
+              >
+                ← Back
+              </button>
+            )}
             {whiteboardName && (
               <h1 className="text-lg sm:text-xl font-bold text-gray-900 dark:text-white truncate">
                 {whiteboardName}
@@ -111,114 +114,52 @@ export default function Toolbar({ onBackToList, onUpdate }: ToolbarProps) {
 
           {/* Right side - Actions */}
           <div className="flex items-center gap-2">
-            {onBackToList && (
-              <button
-                onClick={onBackToList}
-                className="px-3 py-1.5 text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
-                title="Back to Whiteboard List"
-              >
-                ← Back
-              </button>
-            )}
-            <button
-              onClick={handleUndo}
-              className="px-3 py-1.5 text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
-              disabled={!isConnected}
-              title="Undo Last Stroke"
-            >
-              ↶ Undo
-            </button>
-            <button
-              onClick={handleClear}
-              className="px-3 py-1.5 text-sm font-medium text-white bg-red-500 rounded-lg hover:bg-red-600 transition-colors"
-              disabled={!isConnected}
-              title="Clear Whiteboard"
-            >
-              🗑️ Clear
-            </button>
-            {isAuthenticated && roomId && (
+            {/* Settings button: Only show if:
+                1. User is authenticated
+                2. Whiteboard owner is not 'guest'
+                3. Current user is the owner of the whiteboard */}
+            {isAuthenticated && roomId && whiteboardOwner && whiteboardOwner !== 'guest' && user && String(whiteboardOwner) === String(user.id) && (
               <button
                 onClick={() => setShowSettings(true)}
                 className="p-2 text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
                 title="Settings"
               >
-                ⚙️
+                ⚙️ Settings
               </button>
             )}
-            {isAuthenticated && (
-              <button
-                onClick={handleLogout}
-                className="px-3 py-1.5 text-sm font-medium text-white bg-red-500 rounded-lg hover:bg-red-600 transition-colors"
-                title="Logout"
-              >
-                Logout
-              </button>
-            )}
-            <button
-              onClick={() => dispatch(toggleTheme())}
-              className="p-2 text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
-              title="Toggle Theme"
-            >
-              {theme === 'dark' ? '☀️' : '🌙'}
-            </button>
           </div>
         </div>
       </div>
 
       {/* Left Sidebar Toolbar */}
-      <div className={`fixed left-0 top-16 bottom-0 z-40 w-72 bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 shadow-lg overflow-y-auto transition-transform duration-300 ${
-        isSidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
-      }`}>
+      <div className="fixed left-0 top-16 bottom-0 z-40 bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 shadow-lg overflow-y-auto">
         <div className="p-6 space-y-6">
-          {/* Tool Selection */}
+          {/* Combined Tools and Shapes */}
           <div>
             <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">
-              Drawing Tools
+              Tools
             </label>
-            <div className="grid grid-cols-3 gap-2">
-              {tools.map((t) => (
-                <button
-                  key={t.type}
-                  onClick={() => dispatch(setTool(t.type))}
-                  className={`px-4 py-3 text-sm rounded-lg border-2 transition-all ${
-                    tool === t.type
-                      ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/30 shadow-md scale-105'
-                      : 'border-gray-300 dark:border-gray-600 hover:scale-105 bg-white dark:bg-gray-700'
-                  }`}
-                  title={t.label}
-                >
-                  <div className="text-2xl mb-1">{t.icon}</div>
-                  {/* <div className="text-xs font-medium">{t.label}</div> */}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Shape Selection */}
-          {tool !== 'eraser' && (
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">
-                Shapes
-              </label>
-              <div className="grid grid-cols-3 gap-2">
-                {shapes.map((s) => (
+            <div className="grid grid-cols-2 gap-2">
+              {allTools.map((t, index) => {
+                const isSelected = isToolSelected(t.tool, t.shape);
+                return (
                   <button
-                    key={s.type}
-                    onClick={() => dispatch(setShape(s.type))}
-                    className={`px-4 py-3 text-sm rounded-lg border-2 transition-all ${
-                      shape === s.type
+                    key={`${t.tool}-${t.shape}-${index}`}
+                    onClick={() => handleToolSelect(t.tool, t.shape)}
+                    className={`flex flex-col items-center justify-center gap-1 px-1 py-1 text-sm rounded-lg border-2 transition-all ${
+                      isSelected
                         ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/30 shadow-md scale-105'
                         : 'border-gray-300 dark:border-gray-600 hover:scale-105 bg-white dark:bg-gray-700'
                     }`}
-                    title={s.label}
+                    title={t.label}
                   >
-                    <div className="text-2xl mb-1">{s.icon}</div>
-                    {/* <div className="text-xs font-medium">{s.label}</div> */}
+                    <div className="text-2xl">{t.icon}</div>
+                    <div className="text-[12px]">{t.label}</div>
                   </button>
-                ))}
-              </div>
+                );
+              })}
             </div>
-          )}
+          </div>
 
           {/* Color Picker */}
           {tool !== 'eraser' && (
@@ -226,7 +167,7 @@ export default function Toolbar({ onBackToList, onUpdate }: ToolbarProps) {
               <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">
                 Colors
               </label>
-              <div className="grid grid-cols-4 gap-2 mb-3">
+              <div className="grid grid-cols-3 gap-2 mb-3">
                 {colors.map((c) => (
                   <button
                     key={c.value}
@@ -273,6 +214,41 @@ export default function Toolbar({ onBackToList, onUpdate }: ToolbarProps) {
                   {lineWidth}px
                 </span>
               </div>
+            </div>
+          </div>
+
+          {/* Actions */}
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">
+              Actions
+            </label>
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                onClick={handleUndo}
+                className={`flex flex-col items-center justify-center gap-1 px-1 py-1 text-sm rounded-lg border-2 transition-all ${
+                  !isConnected
+                    ? 'border-gray-300 dark:border-gray-600 bg-gray-100 dark:bg-gray-700 opacity-50 cursor-not-allowed'
+                    : 'border-gray-300 dark:border-gray-600 hover:scale-105 bg-white dark:bg-gray-700'
+                }`}
+                disabled={!isConnected}
+                title="Undo Last Stroke"
+              >
+                <div className="text-2xl">↶</div>
+                <div className="text-[12px]">Undo</div>
+              </button>
+              <button
+                onClick={handleClear}
+                className={`px-4 py-3 text-sm rounded-lg border-2 transition-all ${
+                  !isConnected
+                    ? 'border-gray-300 dark:border-gray-600 bg-gray-100 dark:bg-gray-700 opacity-50 cursor-not-allowed'
+                    : 'border-red-500 bg-red-50 dark:bg-red-900/30 hover:scale-105'
+                }`}
+                disabled={!isConnected}
+                title="Clear Whiteboard"
+              >
+                <div className="text-2xl">🗑️</div>
+                <div className="text-[12px]">Clear</div>
+              </button>
             </div>
           </div>
         </div>

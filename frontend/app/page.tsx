@@ -26,10 +26,20 @@ export default function Home() {
     router.push(`/${selectedRoomId}`);
   };
 
+  // Generate 8-character room ID
+  const generateRoomId = (): string => {
+    const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
+    let roomId = '';
+    for (let i = 0; i < 8; i++) {
+      roomId += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    return roomId;
+  };
+
   // Auto-redirect guests to a room
   useEffect(() => {
     if (isGuest && !roomId) {
-      const newRoomId = `room-${Math.random().toString(36).substr(2, 9)}`;
+      const newRoomId = generateRoomId();
       router.push(`/${newRoomId}`);
     }
   }, [isGuest, roomId, router]);

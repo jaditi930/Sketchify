@@ -27,6 +27,7 @@ interface WhiteboardState {
   isDrawing: boolean;
   roomId: string | null;
   whiteboardName: string | null;
+  whiteboardOwner: string | null;
   color: string;
   lineWidth: number;
   userId: string;
@@ -41,6 +42,7 @@ const initialState: WhiteboardState = {
   isDrawing: false,
   roomId: null,
   whiteboardName: null,
+  whiteboardOwner: null,
   color: '#000000',
   lineWidth: 2,
   userId: `user-${Math.random().toString(36).substr(2, 9)}`,
@@ -103,6 +105,9 @@ const whiteboardSlice = createSlice({
     setWhiteboardName: (state, action: PayloadAction<string | null>) => {
       state.whiteboardName = action.payload;
     },
+    setWhiteboardOwner: (state, action: PayloadAction<string | null>) => {
+      state.whiteboardOwner = action.payload;
+    },
     setTool: (state, action: PayloadAction<ToolType>) => {
       state.tool = action.payload;
     },
@@ -125,6 +130,7 @@ export const {
   setLineWidth,
   setConnected,
   setWhiteboardName,
+  setWhiteboardOwner,
   setTool,
   setShape,
 } = whiteboardSlice.actions;

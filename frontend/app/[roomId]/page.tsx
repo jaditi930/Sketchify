@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useAppDispatch, useAppSelector } from '../../src/store/hooks';
-import { setRoomId, clearStrokes } from '../../src/store/slices/whiteboardSlice';
+import { setRoomId, clearStrokes, setWhiteboardOwner } from '../../src/store/slices/whiteboardSlice';
 import { getWhiteboard } from '../../src/lib/whiteboards';
 import Whiteboard from '../../src/components/Whiteboard';
 import Toolbar from '../../src/components/Toolbar';
@@ -14,6 +14,7 @@ export default function RoomPage() {
   const router = useRouter();
   const dispatch = useAppDispatch();
   const { isAuthenticated, token, user } = useAppSelector((state) => state.auth);
+  const { whiteboardOwner } = useAppSelector((state) => state.whiteboard);
   const [isLoading, setIsLoading] = useState(true);
   const [hasAccess, setHasAccess] = useState(false);
   const [error, setError] = useState('');
@@ -25,6 +26,9 @@ export default function RoomPage() {
       
       const data = await getWhiteboard(roomId, token!);
       setHasAccess(true);
+      
+      // Store whiteboard owner in Redux
+      dispatch(setWhiteboardOwner(data.whiteboard.owner));
       
       // Check if user has edit access
       if (user) {
@@ -44,6 +48,13 @@ export default function RoomPage() {
         setHasAccess(false);
       } else if (err.message.includes('404')) {
         // Whiteboard doesn't exist, allow access but will be created
+        // If authenticated user, they will be the owner when socket creates it
+        if (user) {
+          dispatch(setWhiteboardOwner(user.id));
+        } else {
+          // For guest-created whiteboards, owner will be set to 'guest' by socket
+          dispatch(setWhiteboardOwner('guest'));
+        }
         setHasAccess(true);
       } else {
         setError('Failed to load whiteboard');
@@ -52,7 +63,7 @@ export default function RoomPage() {
     } finally {
       setIsLoading(false);
     }
-  }, [token, user]);
+  }, [token, user, dispatch]);
 
   useEffect(() => {
     const roomId = params.roomId as string;
@@ -65,6 +76,9 @@ export default function RoomPage() {
       checkAccess(roomId);
     } else {
       // Guest users can access any room (will be validated on socket level)
+      // For guest-created whiteboards, owner will be set to 'guest' by socket
+      // Set owner to 'guest' initially to hide chat/settings
+      dispatch(setWhiteboardOwner('guest'));
       setHasAccess(true);
       setIsLoading(false);
     }
@@ -116,6 +130,12 @@ export default function RoomPage() {
       </div>
     );
   }
+  
+  // Determine if chat should be shown
+  // Hide chat if:
+  // 1. User is not authenticated (guest), OR
+  // 2. Whiteboard owner is 'guest'
+  const shouldShowChat = isAuthenticated && whiteboardOwner !== 'guest' && whiteboardOwner !== null;
 
   return (
     <main className="relative w-screen h-screen overflow-hidden">
@@ -123,7 +143,7 @@ export default function RoomPage() {
       <div className="pt-16 lg:pl-72 h-full">
         <Whiteboard />
       </div>
-      {isAuthenticated && <Chat />}
+      {shouldShowChat && <Chat />}
     </main>
   );
 }

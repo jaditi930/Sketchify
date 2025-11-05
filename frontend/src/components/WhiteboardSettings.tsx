@@ -34,6 +34,7 @@ export default function WhiteboardSettings({
   const [isVisible, setIsVisible] = useState(false);
 
   const { token, user } = useAppSelector((state) => state.auth);
+  const { whiteboardOwner } = useAppSelector((state) => state.whiteboard);
   const dispatch = useAppDispatch();
 
   useEffect(() => {
@@ -140,7 +141,42 @@ export default function WhiteboardSettings({
     match: String(whiteboard.owner) === String(user?.id),
   });
 
-  const isOwner = String(whiteboard.owner) === String(user?.id);
+  // Check if whiteboard was created by guest or if current user is not the owner
+  const isGuestCreated = whiteboard.owner === 'guest' || whiteboardOwner === 'guest';
+  const isOwner = !isGuestCreated && user && String(whiteboard.owner) === String(user.id);
+  
+  // If whiteboard was created by guest, don't show settings
+  if (isGuestCreated) {
+    return (
+      <div 
+        className={`fixed inset-0 flex items-center justify-center z-50 p-4 transition-opacity duration-300 ${
+          isVisible ? 'bg-black/50 dark:bg-black/70 opacity-100' : 'bg-transparent opacity-0'
+        }`}
+        onClick={(e) => {
+          if (e.target === e.currentTarget) {
+            onClose();
+          }
+        }}
+      >
+        <div className={`bg-white dark:bg-gray-800 rounded-lg p-6 w-full max-w-2xl shadow-xl transition-all duration-300 ${
+          isVisible ? 'scale-100 opacity-100' : 'scale-95 opacity-0'
+        }`}>
+          <div className="flex items-center justify-between mb-6">
+            <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Whiteboard Settings</h2>
+            <button
+              onClick={onClose}
+              className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 text-2xl"
+            >
+              ×
+            </button>
+          </div>
+          <p className="text-gray-600 dark:text-gray-400">
+            Settings are not available for whiteboards created by guest users.
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div 
