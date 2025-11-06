@@ -24,7 +24,7 @@ export default function Whiteboard() {
   const [isDrawing, setIsDrawing] = useState(false);
   const [currentDrawingStroke, setCurrentDrawingStroke] = useState<Stroke | null>(null);
   const dispatch = useAppDispatch();
-  const { strokes, color, lineWidth, roomId, userId, isConnected, tool, shape } = useAppSelector(
+  const { strokes, color, lineWidth, roomId, userId, isConnected, tool, shape, backgroundType } = useAppSelector(
     (state) => state.whiteboard
   );
 
@@ -191,23 +191,79 @@ export default function Whiteboard() {
     resizeCanvas();
     window.addEventListener('resize', resizeCanvas);
 
-    function redraw() {
-      if (!ctx) return;
-      
+    function drawBackground(ctx: CanvasRenderingContext2D, canvasElement: HTMLCanvasElement) {
       // Always keep whiteboard white (like a real whiteboard)
-      // Dark mode only affects the website UI, not the whiteboard canvas itself
       ctx.fillStyle = '#ffffff';
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.fillRect(0, 0, canvasElement.width, canvasElement.height);
+
+      if (backgroundType === 'blank') {
+        // Plain white background - nothing to draw
+        return;
+      }
+
+      // Set up grid/horizontal line style
+      ctx.strokeStyle = '#e5e7eb'; // Light gray color
+      ctx.lineWidth = 1;
+
+      if (backgroundType === 'grid') {
+        // Draw grid pattern
+        const gridSize = 20; // Size of each grid cell
+        
+        // Draw vertical lines
+        for (let x = 0; x <= canvasElement.width; x += gridSize) {
+          ctx.beginPath();
+          ctx.moveTo(x, 0);
+          ctx.lineTo(x, canvasElement.height);
+          ctx.stroke();
+        }
+        
+        // Draw horizontal lines
+        for (let y = 0; y <= canvasElement.height; y += gridSize) {
+          ctx.beginPath();
+          ctx.moveTo(0, y);
+          ctx.lineTo(canvasElement.width, y);
+          ctx.stroke();
+        }
+      } else if (backgroundType === 'horizontal') {
+        // Draw only horizontal lines
+        const lineSpacing = 20; // Spacing between horizontal lines
+        
+        for (let y = 0; y <= canvasElement.height; y += lineSpacing) {
+          ctx.beginPath();
+          ctx.moveTo(0, y);
+          ctx.lineTo(canvasElement.width, y);
+          ctx.stroke();
+        }
+      }
+    }
+
+    function redraw() {
+      if (!ctx || !canvas) return;
       
-      // Draw all strokes
+      // Draw background first on main canvas
+      drawBackground(ctx, canvas);
+      
+      // Create an offscreen canvas for all strokes (to protect background from eraser)
+      const strokesCanvas = document.createElement('canvas');
+      strokesCanvas.width = canvas.width;
+      strokesCanvas.height = canvas.height;
+      const strokesCtx = strokesCanvas.getContext('2d');
+      if (!strokesCtx) return;
+      
+      // Draw all strokes on the offscreen canvas (eraser will erase strokes, not background)
       strokes.forEach((stroke) => {
-        drawStroke(ctx, stroke);
+        drawStroke(strokesCtx, stroke);
       });
       
       // Draw current stroke if drawing
       if (currentDrawingStroke) {
-        drawStroke(ctx, currentDrawingStroke);
+        drawStroke(strokesCtx, currentDrawingStroke);
       }
+      
+      // Composite the strokes canvas onto the main canvas
+      // The background on main canvas remains untouched, and eraser strokes on the
+      // offscreen canvas only erase strokes, not the background
+      ctx.drawImage(strokesCanvas, 0, 0);
     };
 
     const getPointFromEvent = (e: MouseEvent | TouchEvent): { x: number; y: number } => {
@@ -320,7 +376,7 @@ export default function Whiteboard() {
       canvas.removeEventListener('mousedown', handleStart);
       canvas.removeEventListener('touchstart', handleStart);
     };
-  }, [strokes, color, lineWidth, userId, roomId, isConnected, dispatch, isClient, isDrawing, currentDrawingStroke, drawStroke, tool, shape]);
+  }, [strokes, color, lineWidth, userId, roomId, isConnected, dispatch, isClient, isDrawing, currentDrawingStroke, drawStroke, tool, shape, backgroundType]);
 
   if (!isClient) {
     return <div className="flex items-center justify-center h-screen">Loading...</div>;

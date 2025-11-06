@@ -1,8 +1,8 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useAppDispatch, useAppSelector } from '../store/hooks';
-import { setColor, setLineWidth, clearStrokes, setTool, setShape, ToolType, ShapeType } from '../store/slices/whiteboardSlice';
+import { setColor, setLineWidth, clearStrokes, setTool, setShape, setBackgroundType, ToolType, ShapeType, BackgroundType } from '../store/slices/whiteboardSlice';
 import { getSocket } from '../lib/socket';
 import WhiteboardSettings from './WhiteboardSettings';
 
@@ -11,23 +11,38 @@ interface ToolbarProps {
   onUpdate?: () => void;
 }
 
+// Helper function to format keyboard shortcut for display
+const formatShortcut = (key: string): string => {
+  if (typeof window === 'undefined') {
+    return `Ctrl + ${key.toUpperCase()}`;
+  }
+  const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0;
+  const modifier = isMac ? '⌘' : 'Ctrl';
+  return `${modifier} + ${key.toUpperCase()}`;
+};
+
+// Helper function to check if modifier key is pressed
+const isModifierPressed = (e: KeyboardEvent): boolean => {
+  return e.ctrlKey || e.metaKey;
+};
+
 export default function Toolbar({ onBackToList, onUpdate }: ToolbarProps) {
   const dispatch = useAppDispatch();
-  const { color, lineWidth, roomId, whiteboardName, whiteboardOwner, isConnected, tool, shape } = useAppSelector((state) => state.whiteboard);
+  const { color, lineWidth, roomId, whiteboardName, whiteboardOwner, isConnected, tool, shape, backgroundType } = useAppSelector((state) => state.whiteboard);
   const { isAuthenticated, user } = useAppSelector((state) => state.auth);
   const [showSettings, setShowSettings] = useState(false);
 
   // Combined tools and shapes - only one can be selected at a time
   const allTools = [
     // Drawing tools
-    { tool: 'pen' as ToolType, shape: 'freehand' as ShapeType, icon: '✏️', label: 'Pen' },
-    { tool: 'eraser' as ToolType, shape: 'freehand' as ShapeType, icon: '🧹', label: 'Eraser' },
-    { tool: 'highlighter' as ToolType, shape: 'freehand' as ShapeType, icon: '🖍️', label: 'Highlighter' },
+    { tool: 'pen' as ToolType, shape: 'freehand' as ShapeType, icon: '✏️', label: 'Pen', shortcut: 'P' },
+    { tool: 'eraser' as ToolType, shape: 'freehand' as ShapeType, icon: '🧹', label: 'Eraser', shortcut: 'E' },
+    { tool: 'highlighter' as ToolType, shape: 'freehand' as ShapeType, icon: '🖍️', label: 'Highlighter', shortcut: 'H' },
     // Shapes
-    { tool: 'pen' as ToolType, shape: 'line' as ShapeType, icon: '📏', label: 'Line' },
-    { tool: 'pen' as ToolType, shape: 'rectangle' as ShapeType, icon: '▭', label: 'Rectangle' },
-    { tool: 'pen' as ToolType, shape: 'square' as ShapeType, icon: '▢', label: 'Square' },
-    { tool: 'pen' as ToolType, shape: 'circle' as ShapeType, icon: '⭕', label: 'Circle' },
+    { tool: 'pen' as ToolType, shape: 'line' as ShapeType, icon: '📏', label: 'Line', shortcut: 'L' },
+    { tool: 'pen' as ToolType, shape: 'rectangle' as ShapeType, icon: '▭', label: 'Rectangle', shortcut: 'R' },
+    { tool: 'pen' as ToolType, shape: 'square' as ShapeType, icon: '▢', label: 'Square', shortcut: 'S' },
+    { tool: 'pen' as ToolType, shape: 'circle' as ShapeType, icon: '⭕', label: 'Circle', shortcut: 'O' },
   ];
 
   // Check if a tool/shape combination is currently selected
@@ -52,20 +67,20 @@ export default function Toolbar({ onBackToList, onUpdate }: ToolbarProps) {
     { name: 'Orange', value: '#F97316' },
   ];
 
-  const handleClear = () => {
+  const handleClear = useCallback(() => {
     if (roomId && isConnected) {
       const socket = getSocket();
       socket.emit('clear-whiteboard', roomId);
     }
     dispatch(clearStrokes());
-  };
+  }, [roomId, isConnected, dispatch]);
 
-  const handleUndo = () => {
+  const handleUndo = useCallback(() => {
     if (roomId && isConnected) {
       const socket = getSocket();
       socket.emit('undo-stroke', roomId);
     }
-  };
+  }, [roomId, isConnected]);
 
   // Auto-adjust line width when switching tools
   useEffect(() => {
@@ -78,6 +93,63 @@ export default function Toolbar({ onBackToList, onUpdate }: ToolbarProps) {
       dispatch(setLineWidth(2));
     }
   }, [tool, lineWidth, dispatch]);
+
+  // Keyboard shortcuts handler
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Don't trigger shortcuts if user is typing in an input field
+      if (
+        e.target instanceof HTMLInputElement ||
+        e.target instanceof HTMLTextAreaElement ||
+        (e.target instanceof HTMLElement && e.target.isContentEditable)
+      ) {
+        return;
+      }
+
+      // Check if modifier key is pressed
+      if (!isModifierPressed(e)) {
+        return;
+      }
+
+      const key = e.key.toLowerCase();
+
+      // Tool shortcuts
+      const toolMap: Record<string, { tool: ToolType; shape: ShapeType }> = {
+        'p': { tool: 'pen', shape: 'freehand' },
+        'e': { tool: 'eraser', shape: 'freehand' },
+        'h': { tool: 'highlighter', shape: 'freehand' },
+        'l': { tool: 'pen', shape: 'line' },
+        'r': { tool: 'pen', shape: 'rectangle' },
+        's': { tool: 'pen', shape: 'square' },
+        'o': { tool: 'pen', shape: 'circle' },
+      };
+
+      if (toolMap[key]) {
+        e.preventDefault();
+        dispatch(setTool(toolMap[key].tool));
+        dispatch(setShape(toolMap[key].shape));
+        return;
+      }
+
+      // Action shortcuts
+      if (key === 'z' && !e.shiftKey) {
+        // Undo: Ctrl/Cmd + Z
+        e.preventDefault();
+        handleUndo();
+      } else if (key === 'delete' || key === 'backspace' || key === 'k') {
+        // Clear: Ctrl/Cmd + Delete/Backspace/K
+        e.preventDefault();
+        if (isConnected) {
+          handleClear();
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [dispatch, isConnected, handleUndo, handleClear]);
 
   return (
     <>
@@ -142,6 +214,7 @@ export default function Toolbar({ onBackToList, onUpdate }: ToolbarProps) {
             <div className="grid grid-cols-2 gap-2">
               {allTools.map((t, index) => {
                 const isSelected = isToolSelected(t.tool, t.shape);
+                const tooltipText = `${t.label} (${formatShortcut(t.shortcut)})`;
                 return (
                   <button
                     key={`${t.tool}-${t.shape}-${index}`}
@@ -151,7 +224,7 @@ export default function Toolbar({ onBackToList, onUpdate }: ToolbarProps) {
                         ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/30 shadow-md scale-105'
                         : 'border-gray-300 dark:border-gray-600 hover:scale-105 bg-white dark:bg-gray-700'
                     }`}
-                    title={t.label}
+                    title={tooltipText}
                   >
                     <div className="text-2xl">{t.icon}</div>
                     <div className="text-[12px]">{t.label}</div>
@@ -217,6 +290,57 @@ export default function Toolbar({ onBackToList, onUpdate }: ToolbarProps) {
             </div>
           </div>
 
+          {/* Background Type */}
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">
+              Background
+            </label>
+            <div className="flex flex-col space-y-2">
+              <button
+                onClick={() => dispatch(setBackgroundType('blank'))}
+                className={`px-3 py-2 text-sm rounded-lg border-2 transition-all ${
+                  backgroundType === 'blank'
+                    ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/30 shadow-md'
+                    : 'border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700 bg-white dark:bg-gray-700'
+                }`}
+                title="Plain Whiteboard"
+              >
+                <div className="flex items-center gap-2">
+                  <span className="text-lg">⬜</span>
+                  <span>Plain</span>
+                </div>
+              </button>
+              <button
+                onClick={() => dispatch(setBackgroundType('grid'))}
+                className={`px-3 py-2 text-sm rounded-lg border-2 transition-all ${
+                  backgroundType === 'grid'
+                    ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/30 shadow-md'
+                    : 'border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700 bg-white dark:bg-gray-700'
+                }`}
+                title="Grid"
+              >
+                <div className="flex items-center gap-2">
+                  <span className="text-lg">▦</span>
+                  <span>Grid</span>
+                </div>
+              </button>
+              <button
+                onClick={() => dispatch(setBackgroundType('horizontal'))}
+                className={`px-3 py-2 text-sm rounded-lg border-2 transition-all ${
+                  backgroundType === 'horizontal'
+                    ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/30 shadow-md'
+                    : 'border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700 bg-white dark:bg-gray-700'
+                }`}
+                title="Horizontal Lines"
+              >
+                <div className="flex items-center gap-2">
+                  <span className="text-lg">☰</span>
+                  <span>Lines</span>
+                </div>
+              </button>
+            </div>
+          </div>
+
           {/* Actions */}
           <div>
             <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">
@@ -231,7 +355,7 @@ export default function Toolbar({ onBackToList, onUpdate }: ToolbarProps) {
                     : 'border-gray-300 dark:border-gray-600 hover:scale-105 bg-white dark:bg-gray-700'
                 }`}
                 disabled={!isConnected}
-                title="Undo Last Stroke"
+                title={`Undo Last Stroke (${formatShortcut('Z')})`}
               >
                 <div className="text-2xl">↶</div>
                 <div className="text-[12px]">Undo</div>
@@ -244,7 +368,7 @@ export default function Toolbar({ onBackToList, onUpdate }: ToolbarProps) {
                     : 'border-red-500 bg-red-50 dark:bg-red-900/30 hover:scale-105'
                 }`}
                 disabled={!isConnected}
-                title="Clear Whiteboard"
+                title={`Clear Whiteboard (${formatShortcut('K')})`}
               >
                 <div className="text-2xl">🗑️</div>
                 <div className="text-[12px]">Clear</div>

@@ -140,7 +140,7 @@ export default function RoomPage() {
   return (
     <main className="relative w-screen h-screen overflow-hidden">
       <Toolbar onBackToList={isAuthenticated ? handleBackToList : undefined} />
-      <div className="pt-16 lg:pl-72 h-full">
+      <div className="pt-16 h-full">
         <Whiteboard />
       </div>
       {shouldShowChat && <Chat />}

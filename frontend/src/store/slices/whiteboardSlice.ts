@@ -7,6 +7,7 @@ export interface Point {
 
 export type ToolType = 'pen' | 'eraser' | 'highlighter';
 export type ShapeType = 'freehand' | 'line' | 'rectangle' | 'square' | 'circle';
+export type BackgroundType = 'blank' | 'grid' | 'horizontal';
 
 export interface Stroke {
   id: string;
@@ -34,6 +35,7 @@ interface WhiteboardState {
   isConnected: boolean;
   tool: ToolType;
   shape: ShapeType;
+  backgroundType: BackgroundType;
 }
 
 const initialState: WhiteboardState = {
@@ -49,6 +51,7 @@ const initialState: WhiteboardState = {
   isConnected: false,
   tool: 'pen',
   shape: 'freehand',
+  backgroundType: 'blank',
 };
 
 const whiteboardSlice = createSlice({
@@ -114,6 +117,9 @@ const whiteboardSlice = createSlice({
     setShape: (state, action: PayloadAction<ShapeType>) => {
       state.shape = action.payload;
     },
+    setBackgroundType: (state, action: PayloadAction<BackgroundType>) => {
+      state.backgroundType = action.payload;
+    },
   },
 });
 
@@ -133,6 +139,7 @@ export const {
   setWhiteboardOwner,
   setTool,
   setShape,
+  setBackgroundType,
 } = whiteboardSlice.actions;
 
 export default whiteboardSlice.reducer;
