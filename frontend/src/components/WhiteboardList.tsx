@@ -111,32 +111,32 @@ export default function WhiteboardList({ onSelectWhiteboard }: WhiteboardListPro
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 p-4">
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 p-3 sm:p-4 overflow-x-hidden">
       {/* Toast Notification */}
       {showToast && (
-        <div className="fixed top-4 right-4 z-50 animate-slide-in">
-          <div className="bg-white text-green-500 border border-green-500 px-6 py-3 rounded-lg shadow-lg flex items-center gap-2">
+        <div className="fixed top-4 left-4 right-4 sm:left-auto sm:right-4 sm:w-auto z-50 animate-slide-in">
+          <div className="bg-white text-green-500 border border-green-500 px-4 sm:px-6 py-3 rounded-lg shadow-lg flex items-center gap-2 text-sm sm:text-base">
             <span className="text-lg">✓</span>
             <span className="font-medium">Link copied to clipboard!</span>
           </div>
         </div>
       )}
       <div className="max-w-7xl mx-auto">
-        <div className="flex items-center justify-between mb-8">
-          <div>
-            <h1 className="text-4xl font-bold text-gray-900 dark:text-white mb-2">Sketchify</h1>
-            <p className="text-gray-600 dark:text-gray-400">Manage and collaborate on your whiteboards</p>
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
+          <div className="flex-1 min-w-0">
+            <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold text-gray-900 dark:text-white mb-2">Sketchify</h1>
+            <p className="text-sm sm:text-base text-gray-600 dark:text-gray-400">Manage and collaborate on your whiteboards</p>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex justify-end items-center gap-2 sm:gap-3 flex-shrink-0">
             <button
               onClick={handleCreate}
-              className="px-6 py-3 bg-blue-500 hover:bg-blue-600 text-white rounded-lg transition-colors font-medium shadow-md hover:shadow-lg"
+              className="px-4 sm:px-6 py-2 sm:py-3 bg-blue-500 hover:bg-blue-600 text-white rounded-lg transition-colors font-medium shadow-md hover:shadow-lg text-sm sm:text-base whitespace-nowrap"
             >
               + New Whiteboard
             </button>
             <button
               onClick={handleLogout}
-              className="px-6 py-3 bg-red-500 hover:bg-red-600 text-white rounded-lg transition-colors font-medium shadow-md hover:shadow-lg"
+              className="px-4 sm:px-6 py-2 sm:py-3 bg-red-500 hover:bg-red-600 text-white rounded-lg transition-colors font-medium shadow-md hover:shadow-lg text-sm sm:text-base whitespace-nowrap"
               title="Logout"
             >
               Logout
