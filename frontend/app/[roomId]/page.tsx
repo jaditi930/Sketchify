@@ -8,6 +8,7 @@ import { getWhiteboard } from '../../src/lib/whiteboards';
 import Whiteboard from '../../src/components/Whiteboard';
 import Toolbar from '../../src/components/Toolbar';
 import Chat from '../../src/components/Chat';
+import OrientationPrompt from '../../src/components/OrientationPrompt';
 
 export default function RoomPage() {
   const params = useParams();
@@ -139,6 +140,7 @@ export default function RoomPage() {
 
   return (
     <main className="relative w-screen h-screen overflow-hidden">
+      <OrientationPrompt />
       <Toolbar onBackToList={isAuthenticated ? handleBackToList : undefined} />
       <div className="pt-16 h-full">
         <Whiteboard />

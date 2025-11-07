@@ -205,7 +205,7 @@ export default function Toolbar({ onBackToList, onUpdate }: ToolbarProps) {
 
       {/* Left Sidebar Toolbar */}
       <div className="fixed left-0 top-16 bottom-0 z-40 bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 shadow-lg overflow-y-auto">
-        <div className="p-6 space-y-6">
+        <div className="p-6 space-y-6 w-[210px]">
           {/* Combined Tools and Shapes */}
           <div>
             <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">

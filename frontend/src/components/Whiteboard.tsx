@@ -20,6 +20,8 @@ import { getSocket, disconnectSocket } from '../lib/socket';
 
 export default function Whiteboard() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const touchStartedOnCanvasRef = useRef(false);
   const [isClient, setIsClient] = useState(false);
   const [isDrawing, setIsDrawing] = useState(false);
   const [currentDrawingStroke, setCurrentDrawingStroke] = useState<Stroke | null>(null);
@@ -180,16 +182,17 @@ export default function Whiteboard() {
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    // Set canvas size
+    // Set canvas to fixed size of 1500x1500px
+    const CANVAS_WIDTH = 1500;
+    const CANVAS_HEIGHT = 1500;
+    
     const resizeCanvas = () => {
-      const rect = canvas.getBoundingClientRect();
-      canvas.width = rect.width;
-      canvas.height = rect.height;
+      canvas.width = CANVAS_WIDTH;
+      canvas.height = CANVAS_HEIGHT;
       redraw();
     };
 
     resizeCanvas();
-    window.addEventListener('resize', resizeCanvas);
 
     function drawBackground(ctx: CanvasRenderingContext2D, canvasElement: HTMLCanvasElement) {
       // Always keep whiteboard white (like a real whiteboard)
@@ -268,21 +271,82 @@ export default function Whiteboard() {
 
     const getPointFromEvent = (e: MouseEvent | TouchEvent): { x: number; y: number } => {
       const rect = canvas.getBoundingClientRect();
+      
+      // Since canvas CSS size matches its internal size (both 1500x1500),
+      // we can directly use the client coordinates relative to the canvas bounding rect
+      // getBoundingClientRect() already accounts for scroll position
       if (e instanceof TouchEvent) {
         const touch = e.touches[0] || e.changedTouches[0];
         return {
-          x: touch.clientX - rect.left,
-          y: touch.clientY - rect.top,
+          x: ((touch.clientX - rect.left) / rect.width) * canvas.width,
+          y: ((touch.clientY - rect.top) / rect.height) * canvas.height,
         };
       }
       return {
-        x: e.clientX - rect.left,
-        y: e.clientY - rect.top,
+        x: ((e.clientX - rect.left) / rect.width) * canvas.width,
+        y: ((e.clientY - rect.top) / rect.height) * canvas.height,
       };
     };
 
+
+    // Helper to check if event target is an interactive element (should not be prevented)
+    const isInteractiveElement = (target: EventTarget | null): boolean => {
+      if (!target || !(target instanceof HTMLElement)) return false;
+      
+      // Check if it's the canvas itself
+      if (target === canvas) return false;
+      
+      const tagName = target.tagName.toLowerCase();
+      const isInput = tagName === 'input' || tagName === 'textarea' || tagName === 'button' || tagName === 'select';
+      const isContentEditable = target.isContentEditable;
+      
+      // Check if it's inside interactive containers (chat, toolbar, settings, etc)
+      // Be more specific - check for actual UI containers
+      const isInChat = target.closest('[data-chat-container="true"]') !== null ||
+                       target.closest('[class*="Chat"]') !== null || 
+                       target.closest('form') !== null;
+      const isInToolbar = target.closest('[class*="Toolbar"]') !== null ||
+                          target.closest('nav') !== null ||
+                          target.closest('header') !== null;
+      const isInModal = target.closest('[role="dialog"]') !== null ||
+                        target.closest('[class*="Settings"]') !== null;
+      const isInButton = target.closest('button') !== null;
+      const isInInput = target.closest('input, textarea, select') !== null;
+      const isInFixed = target.closest('.fixed') !== null && 
+                       (target.closest('[data-chat-container]') !== null ||
+                        target.closest('nav') !== null ||
+                        target.closest('header') !== null);
+      
+      return isInput || isContentEditable || isInChat || isInToolbar || isInModal || isInButton || isInInput || isInFixed;
+    };
+
     const handleStart = (e: MouseEvent | TouchEvent) => {
-      e.preventDefault();
+      // Check if this is a touch event and if we should allow it
+      if (e instanceof TouchEvent) {
+        // Don't handle if touching an interactive element
+        if (isInteractiveElement(e.target)) {
+          touchStartedOnCanvasRef.current = false;
+          return;
+        }
+        // Only handle if touch started on canvas
+        if (e.target === canvas || (e.target instanceof Node && canvas.contains(e.target))) {
+          touchStartedOnCanvasRef.current = true;
+          e.preventDefault();
+        } else {
+          touchStartedOnCanvasRef.current = false;
+          return;
+        }
+      } else {
+        // For mouse events, only handle if on canvas
+        if (e.target === canvas) {
+          e.preventDefault();
+          touchStartedOnCanvasRef.current = true;
+        } else {
+          touchStartedOnCanvasRef.current = false;
+          return;
+        }
+      }
+
       const point = getPointFromEvent(e);
       setIsDrawing(true);
       
@@ -307,52 +371,99 @@ export default function Whiteboard() {
     };
 
     const handleMove = (e: MouseEvent | TouchEvent) => {
-      e.preventDefault();
-      if (isDrawing && currentDrawingStroke) {
-        const point = getPointFromEvent(e);
-        const isShape = currentDrawingStroke.shape !== 'freehand' && currentDrawingStroke.shape !== undefined;
-        
-        const updatedStroke: Stroke = {
-          ...currentDrawingStroke,
-          points: isShape ? currentDrawingStroke.points : [...currentDrawingStroke.points, point],
-          endPoint: isShape ? point : currentDrawingStroke.endPoint,
-        };
-        setCurrentDrawingStroke(updatedStroke);
-        
-        if (!isShape) {
-          dispatch(updateStroke(point));
-        }
-        
-        redraw(); // Immediate feedback
+      // Only handle if we're actually drawing
+      if (!isDrawing || !currentDrawingStroke) {
+        return;
       }
+
+      // For touch events, only handle if touch started on canvas
+      if (e instanceof TouchEvent) {
+        // If touch didn't start on canvas, cancel drawing
+        if (!touchStartedOnCanvasRef.current) {
+          setIsDrawing(false);
+          setCurrentDrawingStroke(null);
+          return;
+        }
+        // Don't prevent default if touching an interactive element now
+        if (isInteractiveElement(e.target)) {
+          setIsDrawing(false);
+          setCurrentDrawingStroke(null);
+          return;
+        }
+        e.preventDefault();
+      } else {
+        e.preventDefault();
+      }
+
+      const point = getPointFromEvent(e);
+      const isShape = currentDrawingStroke.shape !== 'freehand' && currentDrawingStroke.shape !== undefined;
+      
+      const updatedStroke: Stroke = {
+        ...currentDrawingStroke,
+        points: isShape ? currentDrawingStroke.points : [...currentDrawingStroke.points, point],
+        endPoint: isShape ? point : currentDrawingStroke.endPoint,
+      };
+      setCurrentDrawingStroke(updatedStroke);
+      
+      if (!isShape) {
+        dispatch(updateStroke(point));
+      }
+      
+      redraw(); // Immediate feedback
     };
 
     const handleEnd = (e: MouseEvent | TouchEvent) => {
-      e.preventDefault();
-      if (isDrawing && currentDrawingStroke) {
-        const isShape = currentDrawingStroke.shape !== 'freehand' && currentDrawingStroke.shape !== undefined;
-        const hasValidData = isShape 
-          ? (currentDrawingStroke.startPoint && currentDrawingStroke.endPoint)
-          : currentDrawingStroke.points.length > 0;
-        
-        if (hasValidData) {
-          setIsDrawing(false);
-          dispatch(endStroke());
-          
-          // Add to strokes and emit to server
-          dispatch(addStroke(currentDrawingStroke));
-          
-          if (roomId && isConnected) {
-            const socket = getSocket();
-            socket.emit('draw-stroke', {
-              ...currentDrawingStroke,
-              roomId,
-            });
-          }
-        }
-        
-        setCurrentDrawingStroke(null);
+      // Only handle if we're actually drawing
+      if (!isDrawing || !currentDrawingStroke) {
+        touchStartedOnCanvasRef.current = false;
+        return;
       }
+
+      // For touch events, only handle if touch started on canvas
+      if (e instanceof TouchEvent) {
+        // If touch didn't start on canvas, cancel drawing
+        if (!touchStartedOnCanvasRef.current) {
+          setIsDrawing(false);
+          setCurrentDrawingStroke(null);
+          return;
+        }
+        // Don't prevent default if touching an interactive element now
+        if (isInteractiveElement(e.target)) {
+          setIsDrawing(false);
+          setCurrentDrawingStroke(null);
+          touchStartedOnCanvasRef.current = false;
+          return;
+        }
+        e.preventDefault();
+      } else {
+        e.preventDefault();
+      }
+      
+      // Reset touch tracking
+      touchStartedOnCanvasRef.current = false;
+
+      const isShape = currentDrawingStroke.shape !== 'freehand' && currentDrawingStroke.shape !== undefined;
+      const hasValidData = isShape 
+        ? (currentDrawingStroke.startPoint && currentDrawingStroke.endPoint)
+        : currentDrawingStroke.points.length > 0;
+      
+      if (hasValidData) {
+        setIsDrawing(false);
+        dispatch(endStroke());
+        
+        // Add to strokes and emit to server
+        dispatch(addStroke(currentDrawingStroke));
+        
+        if (roomId && isConnected) {
+          const socket = getSocket();
+          socket.emit('draw-stroke', {
+            ...currentDrawingStroke,
+            roomId,
+          });
+        }
+      }
+      
+      setCurrentDrawingStroke(null);
     };
 
     // Mouse events
@@ -368,7 +479,6 @@ export default function Whiteboard() {
     redraw();
 
     return () => {
-      window.removeEventListener('resize', resizeCanvas);
       window.removeEventListener('mousemove', handleMove);
       window.removeEventListener('mouseup', handleEnd);
       window.removeEventListener('touchmove', handleMove);
@@ -418,10 +528,16 @@ export default function Whiteboard() {
   };
 
   return (
-    <canvas
-      ref={canvasRef}
-      className="w-full h-full touch-none bg-white border border-gray-200 dark:border-gray-700 shadow-inner"
-      style={getCursorStyle()}
-    />
+    <div ref={containerRef} className="w-full h-full overflow-auto">
+      <canvas
+        ref={canvasRef}
+        className="touch-none bg-white border border-gray-200 dark:border-gray-700 shadow-inner"
+        style={{
+          ...getCursorStyle(),
+          width: '2000px',
+          height: '2000px',
+        }}
+      />
+    </div>
   );
 }
