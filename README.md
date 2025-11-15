@@ -1,15 +1,13 @@
 # Real-Time Collaboration Whiteboard
 
-A real-time collaborative whiteboard application built with Next.js, Express.js, Socket.io, MongoDB, and Redux. Features WebSocket-based real-time synchronization, offline support with Service Workers, and a responsive UI with theme switching.
+A real-time collaborative whiteboard application built with Next.js, Express.js, Socket.io, MongoDB, and Redux. Features WebSocket-based real-time synchronization and offline support with Service Workers.
 
 ## Features
 
 - 🎨 **Whiteboard-like Collaboration**: Draw and collaborate in real-time
 - 🔄 **WebSocket Real-time Updates**: Instant synchronization using Socket.io
 - 📱 **Offline Support**: Service Worker for offline functionality
-- 🎨 **Theme Switching**: Light/Dark mode toggle
 - 📱 **Responsive Design**: Works on desktop, tablet, and mobile devices
-- 🔌 **MongoDB Integration**: Persistent storage for whiteboard data
 
 ## Tech Stack
 
@@ -30,23 +28,40 @@ A real-time collaborative whiteboard application built with Next.js, Express.js,
 ## Project Structure
 
 ```
-collaboration-tool/
+Sketchify/
+├── docs/              # Project documentation (backend APIs, flows, frontend, sockets)
+│   ├── backend-api.md
+│   ├── backend-flows.md
+│   ├── frontend-flows.md
+│   └── sockets.md
 ├── frontend/          # Next.js frontend application
-│   ├── app/           # Next.js app directory
+│   ├── app/           # App Router entry points
 │   ├── src/
 │   │   ├── components/  # React components
 │   │   ├── store/       # Redux store and slices
-│   │   └── lib/         # Utilities (socket, serviceWorker)
+│   │   └── lib/         # REST + socket utilities, service worker helpers
 │   └── public/          # Static assets and Service Worker
 │
-└── backend/          # Express.js backend
+└── backend/           # Express.js backend
     ├── src/
     │   ├── models/     # MongoDB models
     │   ├── socket/     # Socket.io handlers
-    │   ├── config/     # Database configuration
-    │   └── server.ts   # Express server
+    │   ├── middleware/ # Auth + socket middleware
+    │   ├── routes/     # REST endpoints
+    │   └── server.ts   # Express server bootstrap
     └── package.json
 ```
+
+## Documentation
+
+The `docs/` directory contains curated references for extending and operating Sketchify:
+
+- `docs/backend-api.md` — REST endpoints, payloads, and error semantics.
+- `docs/backend-flows.md` — Authentication, whiteboard lifecycles, and collaboration flows.
+- `docs/frontend-flows.md` — App routing, Redux orchestration, and UI responsibilities.
+- `docs/sockets.md` — Socket.IO event contracts for whiteboard and chat channels.
+
+Refer to these files before modifying APIs, sockets, or front-end flows to keep changes consistent.
 
 ## Getting Started
 
@@ -60,7 +75,7 @@ collaboration-tool/
 
 1. **Clone or navigate to the project directory**
    ```bash
-   cd collaboration-tool
+   cd Sketchify
    ```
 
 2. **Backend Setup**
@@ -81,17 +96,20 @@ collaboration-tool/
 
    Create a `.env` file in the `backend/` directory:
    ```env
+   MONGODB_URI=mongodb+srv://<userName>:<db_password>@mongoURI
+   DB_PASSWORD=<mongoDbPassword>
+   JWT_SECRET=JWTmongoPasswordKey
    PORT=3001
-   MONGODB_URI=mongodb+srv://aditijain:<db_password>@productcluster.cbzsw7t.mongodb.net/?appName=productCluster
    CORS_ORIGIN=http://localhost:3000
    ```
 
-   **Important**: Replace `<db_password>` with your actual MongoDB password.
+   **Important**: Replace `<mongoDbPassword>` with your actual MongoDB password.
 
 2. **Frontend Environment Variables**
 
    Create a `.env.local` file in the `frontend/` directory:
    ```env
+   NEXT_PUBLIC_SOCKET_URL=http://localhost:3001
    NEXT_PUBLIC_SOCKET_URL=http://localhost:3001
    ```
 
@@ -116,25 +134,20 @@ collaboration-tool/
 
 ## Usage
 
-1. **Create or Join a Room**
-   - Generate a new room ID or enter an existing room ID
-   - Click "Join Room" to start collaborating
+1. **Create or Open an existing Whiteboard**
+   - If not login then click on "Continue as Guest" to open whiteboard.
+   - If login then:
+      - Click "+ New Whiteboard" to create and start collaborating
+      - Click on "Open" button on any existing whiteboard from the listing.
 
 2. **Drawing**
    - Click and drag to draw on the whiteboard
-   - Select colors from the toolbar
-   - Adjust line width with the slider
-   - Use touch on mobile devices
+   - Select colors, tools from the toolbar
 
 3. **Collaboration**
-   - Share the room ID with others to collaborate in real-time
+   - Either make whiteboard public from settings or add emails of users to add them as collaborator
    - All drawings are synchronized across all connected users
    - Changes are saved to MongoDB
-
-4. **Features**
-   - **Clear**: Clear the entire whiteboard
-   - **Undo**: Remove the last stroke
-   - **Theme Toggle**: Switch between light and dark mode
 
 ## Service Worker (Offline Support)
 
@@ -159,24 +172,3 @@ cd frontend
 npm run build
 npm start
 ```
-
-## Environment Variables for Production
-
-Update the environment variables with your production URLs:
-
-**Backend `.env`:**
-```env
-PORT=3001
-MONGODB_URI=your_production_mongodb_uri
-CORS_ORIGIN=https://your-frontend-domain.com
-```
-
-**Frontend `.env.local`:**
-```env
-NEXT_PUBLIC_SOCKET_URL=https://your-backend-domain.com
-```
-
-## License
-
-MIT
-
