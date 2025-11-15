@@ -110,7 +110,7 @@ Refer to these files before modifying APIs, sockets, or front-end flows to keep 
    Create a `.env.local` file in the `frontend/` directory:
    ```env
    NEXT_PUBLIC_SOCKET_URL=http://localhost:3001
-   NEXT_PUBLIC_SOCKET_URL=http://localhost:3001
+   NEXT_PUBLIC_API_URL=http://localhost:3001
    ```
 
 ### Running the Application

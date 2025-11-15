@@ -19,7 +19,7 @@ export const getSocket = (token?: string | null): Socket => {
     });
   } else if (token) {
     // If token changed and socket is connected, reconnect with new token
-    const currentToken = socket.handshake?.auth?.token || (typeof window !== 'undefined' ? localStorage.getItem('token') : null);
+    const currentToken = (socket?.auth as any)?.token || (typeof window !== 'undefined' ? localStorage.getItem('token') : null);
     if (currentToken !== token) {
       socket.disconnect();
       socket = io(SOCKET_URL, {
